@@ -3,6 +3,7 @@ package spdy
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -79,6 +80,7 @@ type clientStream struct {
 	pw   *io.PipeWriter
 	pr   *io.PipeReader
 	buf  *bytes.Buffer
+	req  *http.Request
 }
 
 type stickyErrWriter struct {
@@ -225,7 +227,7 @@ func (cc *clientConn) roundTrip(req *http.Request) (*http.Response, error) {
 		return nil, errClientConnClosed
 	}
 
-	cs := cc.newStream()
+	cs := cc.newStream(req)
 	// TODO(jabley): Only need to support GET at the moment, which doesn't have a body
 	hasBody := false
 
@@ -313,10 +315,11 @@ func (cc *clientConn) canTakeNewRequest() bool {
 }
 
 // requires cc.mu be held.
-func (cc *clientConn) newStream() *clientStream {
+func (cc *clientConn) newStream(req *http.Request) *clientStream {
 	cs := &clientStream{
 		ID:   cc.nextStreamID,
 		resc: make(chan resAndError, 1),
+		req:  req,
 	}
 	cc.nextStreamID += 2
 	cc.streams[cs.ID] = cs
@@ -412,7 +415,7 @@ func (cc *clientConn) readLoop() {
 			}
 			cc.nextRes.Header = header
 
-			// log.Printf("Read headers %v\n", header)
+			log.Printf("Read headers %v\n", header)
 		case *DataFrame:
 			cs = cc.streamByID(f.StreamID, streamEnded)
 			// log.Printf("DATA: %q", f.Data())
@@ -434,7 +437,14 @@ func (cc *clientConn) readLoop() {
 		if streamEnded {
 			// cs.pw.Close()
 			delete(activeRes, streamID)
-			cc.nextRes.Body = &ClosingBuffer{cs.buf}
+			body := &ClosingBuffer{cs.buf}
+
+			if unrequestedGzip(cs.req.Header, cc.nextRes.Header) {
+				cc.nextRes.Body = &gzipReader{body: body}
+			} else {
+				cc.nextRes.Body = body
+			}
+
 			res := cc.nextRes
 			cs.resc <- resAndError{res: res}
 		}
@@ -457,4 +467,40 @@ type ClosingBuffer struct {
 
 func (cb *ClosingBuffer) Close() error {
 	return nil
+}
+
+// unrequestedGzip returns true if the request did
+// not ask for the returned content encoding and that
+// encoding is gzip, which is allowed in the SPDY spec.
+func unrequestedGzip(reqHeader http.Header, resHeader http.Header) bool {
+	got := resHeader.Get("Content-Encoding")
+	switch got {
+	case "gzip":
+	default:
+		return false
+	}
+
+	requested := reqHeader.Get("Accept-Encoding")
+	return !strings.Contains(requested, got)
+}
+
+// gzipReader wraps a response body so it can lazily
+// call gzip.NewReader on the first call to Read
+type gzipReader struct {
+	body io.ReadCloser // underlying Response.Body
+	zr   io.Reader     // lazily-initialized gzip reader
+}
+
+func (gz *gzipReader) Read(p []byte) (n int, err error) {
+	if gz.zr == nil {
+		gz.zr, err = gzip.NewReader(gz.body)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return gz.zr.Read(p)
+}
+
+func (gz *gzipReader) Close() error {
+	return gz.body.Close()
 }
