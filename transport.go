@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"sync"
 )
@@ -19,19 +20,35 @@ type Transport struct {
 	connMu          sync.Mutex
 	conns           map[string][]*clientConn
 	InsecureTLSDial bool
+	Fallback        http.RoundTripper
 }
 
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.Fallback == nil {
+		t.Fallback = http.DefaultTransport
+	}
+
 	host, port, err := net.SplitHostPort(req.URL.Host)
 	if err != nil {
 		host = req.URL.Host
 		port = "443"
 	}
 
+	switch req.URL.Scheme {
+	case "http":
+		// Not going to try doing SPDY over http
+		return t.Fallback.RoundTrip(req)
+	}
+
 	for {
-		cc, err := t.getClientConn(host, port)
+		cc, conn, err := t.getClientConn(host, port)
 		if err != nil {
-			return nil, err
+			if conn != nil {
+				httpConn := httputil.NewClientConn(conn, nil)
+				return httpConn.Do(req)
+			} else {
+				return nil, err
+			}
 		}
 		res, err := cc.roundTrip(req)
 		if shouldRetryRequest(err) { // TODO: or clientconn is overloaded (too many outstanding requests)?
@@ -42,7 +59,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 		return res, nil
 	}
-
 }
 
 type clientConn struct {
@@ -112,7 +128,7 @@ func filterOutClientConn(in []*clientConn, exclude *clientConn) []*clientConn {
 	return out
 }
 
-func (t *Transport) getClientConn(host, port string) (*clientConn, error) {
+func (t *Transport) getClientConn(host, port string) (*clientConn, net.Conn, error) {
 	t.connMu.Lock()
 	defer t.connMu.Unlock()
 
@@ -120,21 +136,21 @@ func (t *Transport) getClientConn(host, port string) (*clientConn, error) {
 
 	for _, cc := range t.conns[key] {
 		if cc.canTakeNewRequest() {
-			return cc, nil
+			return cc, nil, nil
 		}
 	}
 	if t.conns == nil {
 		t.conns = make(map[string][]*clientConn)
 	}
-	cc, err := t.newClientConn(host, port, key)
+	cc, conn, err := t.newClientConn(host, port, key)
 	if err != nil {
-		return nil, err
+		return nil, conn, err
 	}
 	t.conns[key] = append(t.conns[key], cc)
-	return cc, nil
+	return cc, nil, nil
 }
 
-func (t *Transport) newClientConn(host, port, key string) (*clientConn, error) {
+func (t *Transport) newClientConn(host, port, key string) (*clientConn, net.Conn, error) {
 	// log.Printf("Creating a new client connection for %s\n", key)
 
 	cfg := &tls.Config{
@@ -144,27 +160,25 @@ func (t *Transport) newClientConn(host, port, key string) (*clientConn, error) {
 	}
 	tconn, err := tls.Dial("tcp", host+":"+port, cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := tconn.Handshake(); err != nil {
 		tconn.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	if !t.InsecureTLSDial {
 		if err := tconn.VerifyHostname(cfg.ServerName); err != nil {
 			tconn.Close()
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	state := tconn.ConnectionState()
 	if p := state.NegotiatedProtocol; p != NextProtoTLS {
-		// TODO(jabley): fall back to Fallback
-		tconn.Close()
-		return nil, fmt.Errorf("bad protocol: %v", p)
+		return nil, tconn, fmt.Errorf("bad protocol: %v", p)
 	}
 	if !state.NegotiatedProtocolIsMutual {
 		tconn.Close()
-		return nil, fmt.Errorf("could not negotiate protocol mutually %q", state.NegotiatedProtocol)
+		return nil, nil, fmt.Errorf("could not negotiate protocol mutually %q", state.NegotiatedProtocol)
 	}
 
 	// log.Printf("Got a client connection\n")
@@ -193,13 +207,13 @@ func (t *Transport) newClientConn(host, port, key string) (*clientConn, error) {
 	cc.bw.Flush()
 	if cc.werr != nil {
 		tconn.Close()
-		return nil, cc.werr
+		return nil, nil, cc.werr
 	}
 
 	cc.dec = NewDecoder()
 
 	go cc.readLoop()
-	return cc, nil
+	return cc, nil, nil
 }
 
 func (t *Transport) removeClientConn(cc *clientConn) {
