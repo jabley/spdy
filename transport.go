@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -115,7 +114,6 @@ type clientStream struct {
 	resc chan resAndError
 	pw   *io.PipeWriter
 	pr   *io.PipeReader
-	buf  *bytes.Buffer
 	req  *http.Request
 }
 
@@ -412,6 +410,7 @@ func (cc *clientConn) readLoop() {
 			streamEnded = ff.StreamEnded()
 		}
 
+		headersEnded := false
 		// log.Printf("Stream Ended? %v for %v\n", streamEnded, f.Header())
 
 		var cs *clientStream
@@ -457,8 +456,7 @@ func (cc *clientConn) readLoop() {
 				Proto:      "HTTP/1.1",
 				ProtoMajor: 1,
 			}
-			// cs.pr, cs.pw = io.Pipe()
-			cs.buf = &bytes.Buffer{}
+			cs.pr, cs.pw = io.Pipe()
 			header, err := cc.dec.Decode(f.Headers)
 
 			if err != nil {
@@ -467,19 +465,10 @@ func (cc *clientConn) readLoop() {
 			}
 			cc.nextRes.Header = header
 
-			// TODO(jabley): if we've got a stream ended flag, then there
-			// will be no body. Set a flag to send a resAndError message to
-			// cs.resc
+			headersEnded = true
 		case *DataFrame:
 			cs = cc.streamByID(f.StreamID, streamEnded)
-
-			// TODO(jabley): can't write to the pipe without having sent a
-			// resAndError to the cs.resc.
-			// For now, uses a bytes.Buffer instead. Uses more memory, but
-			// less state to worry about :(
-
-			// _, err := cs.pw.Write(f.Data())
-			cs.buf.Write(f.Data())
+			cs.pw.Write(f.Data())
 		case *GoAwayFrame:
 			cc.t.removeClientConn(cc)
 			cc.setGoAway(f)
@@ -490,17 +479,22 @@ func (cc *clientConn) readLoop() {
 		}
 
 		if streamEnded {
-			// cs.pw.Close()
+			cs.pw.Close()
 			delete(activeRes, streamID)
-			body := ioutil.NopCloser(cs.buf)
+		}
+
+		if headersEnded {
+			if cs == nil {
+				panic("couldn't find stream") // TODO be graceful
+			}
+			// TODO: set the Body to one which notes the Close
+			cc.nextRes.Body = cs.pr
 
 			if unrequestedGzip(cs.req.Header, cc.nextRes.Header) {
-				cc.nextRes.Body = &gzipReader{body: body}
-			} else {
-				cc.nextRes.Body = body
+				cc.nextRes.Body = &gzipReader{body: cc.nextRes.Body}
 			}
-
 			res := cc.nextRes
+			activeRes[streamID] = cs
 			cs.resc <- resAndError{res: res}
 		}
 	}
