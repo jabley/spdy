@@ -485,7 +485,7 @@ func (cc *clientConn) readLoop() {
 var errClientConnClosed = errors.New("spdy: client conn is closed")
 
 func shouldRetryRequest(err error) bool {
-	return false
+	return err == errClientConnClosed
 }
 
 func notImplemented() error {
