@@ -44,8 +44,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		cc, conn, err := t.getClientConn(host, port)
 		if err != nil {
 			if conn != nil {
-				httpConn := httputil.NewClientConn(conn, nil)
-				return httpConn.Do(req)
+				return t.doHTTP(conn, req)
 			} else {
 				return nil, err
 			}
@@ -59,6 +58,26 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 		return res, nil
 	}
+}
+
+func (t *Transport) doHTTP(conn net.Conn, req *http.Request) (*http.Response, error) {
+	httpConn := httputil.NewClientConn(conn, nil)
+	res, err := httpConn.Do(req)
+
+	if err != nil {
+		return res, err
+	}
+
+	if !res.Close {
+		// TODO(jabley): pool the connection.
+	} else {
+		err = httpConn.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return res, err
 }
 
 type clientConn struct {
