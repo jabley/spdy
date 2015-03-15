@@ -456,13 +456,9 @@ func (cc *clientConn) readLoop() {
 			// _, err := cs.pw.Write(f.Data())
 			cs.buf.Write(f.Data())
 			// log.Printf("Wrote data to pipe\n")
-		// case *GoAwayFrame:
-		// 	cc.t.removeClientConn(cc)
-		// 	if f.ErrCode != 0 {
-		// 		// TODO: deal with GOAWAY more. particularly the error code
-		// 		log.Printf("transport got GOAWAY with error code = %v", f.ErrCode)
-		// 	}
-		// 	cc.setGoAway(f)
+		case *GoAwayFrame:
+			cc.t.removeClientConn(cc)
+			cc.setGoAway(f)
 		default:
 			log.Printf("Transport: unhandled response frame type %T", f)
 		}

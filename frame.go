@@ -86,6 +86,7 @@ type frameParser func(fr *Framer, fh FrameHeader, payload []byte) (Frame, error)
 var frameParsers = map[FrameType]frameParser{
 	FrameSettings: parseSettingsFrame,
 	FrameSYNReply: parseSynReplyFrame,
+	FrameGoAway:   parseGoAwayFrame,
 }
 
 func typeFrameParser(t FrameType) frameParser {
@@ -636,9 +637,19 @@ func (sr *SynReplyFrame) StreamEnded() bool {
 // A GoAwayFrame informs the remote peer to stop creating streams on this connection.
 // http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-GOAWAY
 type GoAwayFrame struct {
+	FrameHeader
 	LastStreamID uint32
-	ErrCode      ErrCode
-	debugData    []byte
+}
+
+// +----------------------------------+
+// |1|       2          |       7     |
+// +----------------------------------+
+// | 0 (flags) |     4 (length)       |
+// +----------------------------------|
+// |X|  Last-good-stream-ID (31 bits) |
+// +----------------------------------+
+func parseGoAwayFrame(fr *Framer, fh FrameHeader, p []byte) (Frame, error) {
+	return &GoAwayFrame{LastStreamID: fr.readUint32(p)}, nil
 }
 
 // An UnknownFrame is the frame type returned when the frame type is unknown
