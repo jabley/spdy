@@ -87,6 +87,7 @@ var frameParsers = map[FrameType]frameParser{
 	FrameSettings: parseSettingsFrame,
 	FrameSYNReply: parseSynReplyFrame,
 	FrameGoAway:   parseGoAwayFrame,
+	FrameNOOP:     parseNoopFrame,
 }
 
 func typeFrameParser(t FrameType) frameParser {
@@ -650,6 +651,21 @@ type GoAwayFrame struct {
 // +----------------------------------+
 func parseGoAwayFrame(fr *Framer, fh FrameHeader, p []byte) (Frame, error) {
 	return &GoAwayFrame{LastStreamID: fr.readUint32(p)}, nil
+}
+
+// A NoopFrame can be ignored.
+// http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-NOOP
+type NoopFrame struct {
+	FrameHeader
+}
+
+// +----------------------------------+
+// |1|       2          |       5     |
+// +----------------------------------+
+// | 0 (Flags)  |    0 (Length)       |
+// +----------------------------------+
+func parseNoopFrame(fr *Framer, fh FrameHeader, p []byte) (Frame, error) {
+	return &NoopFrame{}, nil
 }
 
 // An UnknownFrame is the frame type returned when the frame type is unknown

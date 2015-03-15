@@ -459,6 +459,8 @@ func (cc *clientConn) readLoop() {
 		case *GoAwayFrame:
 			cc.t.removeClientConn(cc)
 			cc.setGoAway(f)
+		case *NoopFrame:
+			// Receivers of a NO-OP frame should simply ignore it.
 		default:
 			log.Printf("Transport: unhandled response frame type %T", f)
 		}
