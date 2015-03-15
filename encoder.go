@@ -3,6 +3,7 @@ package spdy
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/binary"
 	"errors"
 	"io"
 	"log"
@@ -60,7 +61,7 @@ func (d *decoder) Decode(data []byte) (headers http.Header, err error) {
 
 	var size = 2
 	var bytesToInt = func(b []byte) int {
-		return int(BytesToUint16(b))
+		return int(binary.BigEndian.Uint16(b))
 	}
 
 	// return nil, notImplemented()
@@ -281,22 +282,10 @@ func WriteExactly(w io.Writer, data []byte) error {
 // are read if possible, even if multiple calls to Read
 // are required.
 func ReadExactly(r io.Reader, i int) ([]byte, error) {
-	out := make([]byte, i)
-	in := out[:]
-	for i > 0 {
-		if r == nil {
-			return nil, ErrConnNil
-		}
-		if n, err := r.Read(in); err != nil {
-			return nil, err
-		} else {
-			in = in[n:]
-			i -= n
-		}
+	if r == nil {
+		return nil, ErrConnNil
 	}
-	return out, nil
-}
-
-func BytesToUint16(b []byte) uint16 {
-	return (uint16(b[0]) << 8) + uint16(b[1])
+	out := make([]byte, i)
+	_, err := io.ReadFull(r, out)
+	return out, err
 }

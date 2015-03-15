@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -472,7 +473,7 @@ func (cc *clientConn) readLoop() {
 		if streamEnded {
 			// cs.pw.Close()
 			delete(activeRes, streamID)
-			body := &ClosingBuffer{cs.buf}
+			body := ioutil.NopCloser(cs.buf)
 
 			if unrequestedGzip(cs.req.Header, cc.nextRes.Header) {
 				cc.nextRes.Body = &gzipReader{body: body}
@@ -494,14 +495,6 @@ func shouldRetryRequest(err error) bool {
 
 func notImplemented() error {
 	return fmt.Errorf("Not implemented")
-}
-
-type ClosingBuffer struct {
-	*bytes.Buffer
-}
-
-func (cb *ClosingBuffer) Close() error {
-	return nil
 }
 
 // unrequestedGzip returns true if the request did
