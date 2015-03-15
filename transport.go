@@ -453,14 +453,19 @@ func (cc *clientConn) readLoop() {
 			}
 			cc.nextRes.Header = header
 
-			log.Printf("Read headers %v\n", header)
+			// TODO(jabley): if we've got a stream ended flag, then there
+			// will be no body. Set a flag to send a resAndError message to
+			// cs.resc
 		case *DataFrame:
 			cs = cc.streamByID(f.StreamID, streamEnded)
-			// log.Printf("DATA: %q", f.Data())
-			// log.Printf("Writing data to pipe\n")
+
+			// TODO(jabley): can't write to the pipe without having sent a
+			// resAndError to the cs.resc.
+			// For now, uses a bytes.Buffer instead. Uses more memory, but
+			// less state to worry about :(
+
 			// _, err := cs.pw.Write(f.Data())
 			cs.buf.Write(f.Data())
-			// log.Printf("Wrote data to pipe\n")
 		case *GoAwayFrame:
 			cc.t.removeClientConn(cc)
 			cc.setGoAway(f)
