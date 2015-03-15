@@ -27,6 +27,10 @@ I'm not sure I will do that. For my purposes, GET is all that I need to
 pull data out of various [backing services](http://12factor.net/backing-services). I would also want to
 write tests before having the confidence to run it in production.
 
+I'm hopeful that I will be able to use HTTP/2 in production in near
+future, so there seems little point in making that investment in this
+project.
+
 # Acknowledgements
 
 I've read Brad Fitzpatrick's HTTP/2 and Jamie Hall's SPDY implementation. A lot of
