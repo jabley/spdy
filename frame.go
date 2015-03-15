@@ -636,6 +636,19 @@ func (sr *SynReplyFrame) StreamEnded() bool {
 	return sr.Flags.Has(FlagFin)
 }
 
+type RstStreamFrame struct {
+	FrameHeader
+	StreamID   uint32
+	StatusCode ErrCode
+}
+
+func (fr *Framer) WriteRstStreamFrame(rst RstStreamFrame) error {
+	fr.startWrite(FrameRSTStream, 0)
+	fr.writeUint32(rst.StreamID)
+	fr.writeUint32(uint32(rst.StatusCode))
+	return fr.endWrite()
+}
+
 // A GoAwayFrame informs the remote peer to stop creating streams on this connection.
 // http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-GOAWAY
 type GoAwayFrame struct {

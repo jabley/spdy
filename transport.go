@@ -391,7 +391,7 @@ func (cc *clientConn) readLoop() {
 
 	// continueStreamID is the stream ID we're waiting for
 	// continuation frames for.
-	// var continueStreamID uint32
+	var continueStreamID uint32
 
 	for {
 		// log.Printf("Entered read loop for %v\n", cc.connKey)
@@ -437,6 +437,20 @@ func (cc *clientConn) readLoop() {
 				// Ignore server push for now
 				break
 			}
+
+			if continueStreamID == f.StreamID {
+				// If an endpoint receives multiple SYN_REPLY frames for the
+				// same active stream ID, it must drop the stream, and send a
+				// RST_STREAM for the stream with the error PROTOCOL_ERROR.
+				cc.fr.WriteRstStreamFrame(RstStreamFrame{
+					StreamID: f.StreamID, StatusCode: ErrCodeProtocol})
+				delete(activeRes, streamID)
+				break
+			}
+
+			// store the StreamID so that we can track duplicate HEADERS
+			// and SYN_STREAM frames
+			continueStreamID = f.StreamID
 
 			cs = cc.streamByID(f.StreamID, streamEnded)
 			cc.nextRes = &http.Response{
