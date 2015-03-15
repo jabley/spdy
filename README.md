@@ -1,7 +1,6 @@
 # SPDY
 
-Implementation in Go. A learning exercise in implementing a network
-protocol in Go.
+A learning exercise in implementing a [network protocol](http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2) in Go.
 
 # Testing
 
