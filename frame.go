@@ -385,7 +385,7 @@ func (fr *Framer) ReadFrame() (Frame, error) {
 
 // A DataFrame conveys arbitrary, variable-length sequences of octets
 // associated with a stream.
-// See http://http2.github.io/http2-spec/#rfc.section.6.1
+// See http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-Data-frames
 type DataFrame struct {
 	FrameHeader
 	StreamID uint32
@@ -454,7 +454,7 @@ func (f *Framer) WriteData(streamID uint32, endStream bool, data []byte) error {
 // endpoints communicate, such as preferences and constraints on peer
 // behavior.
 //
-// See http://http2.github.io/http2-spec/#SETTINGS
+// See http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-SETTINGS
 type SettingsFrame struct {
 	FrameHeader
 	p []byte
@@ -634,7 +634,7 @@ func (sr *SynReplyFrame) StreamEnded() bool {
 }
 
 // A GoAwayFrame informs the remote peer to stop creating streams on this connection.
-// See http://http2.github.io/http2-spec/#rfc.section.6.8
+// http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-GOAWAY
 type GoAwayFrame struct {
 	LastStreamID uint32
 	ErrCode      ErrCode

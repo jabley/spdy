@@ -152,7 +152,7 @@ var HeaderDictionary = []byte{
 // Setting is a setting parameter: which setting it is, and its value.
 type Setting struct {
 	// ID is which setting is being set.
-	// See http://http2.github.io/http2-spec/#SettingValues
+	// See http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-SETTINGS
 	ID    SettingID
 	Flags Flags
 	// Val is the value.
