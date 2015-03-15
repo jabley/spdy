@@ -88,6 +88,7 @@ var frameParsers = map[FrameType]frameParser{
 	FrameSYNReply: parseSynReplyFrame,
 	FrameGoAway:   parseGoAwayFrame,
 	FrameNOOP:     parseNoopFrame,
+	FramePing:     parsePingFrame,
 }
 
 func typeFrameParser(t FrameType) frameParser {
@@ -666,6 +667,29 @@ type NoopFrame struct {
 // +----------------------------------+
 func parseNoopFrame(fr *Framer, fh FrameHeader, p []byte) (Frame, error) {
 	return &NoopFrame{}, nil
+}
+
+// +----------------------------------+
+// |1|       2          |       6     |
+// +----------------------------------+
+// | 0 (flags) |     4 (length)       |
+// +----------------------------------|
+// |            32-bit ID             |
+// +----------------------------------+
+// http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft2#TOC-PING
+type PingFrame struct {
+	FrameHeader
+	ID uint32
+}
+
+func parsePingFrame(fr *Framer, fh FrameHeader, p []byte) (Frame, error) {
+	return &PingFrame{ID: fr.readUint32(p[0:4])}, nil
+}
+
+func (fr *Framer) WritePing(p *PingFrame) error {
+	fr.startWrite(FramePing, 0)
+	fr.writeUint32(p.ID)
+	return fr.endWrite()
 }
 
 // An UnknownFrame is the frame type returned when the frame type is unknown

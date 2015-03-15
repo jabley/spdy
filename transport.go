@@ -416,6 +416,10 @@ func (cc *clientConn) readLoop() {
 		var cs *clientStream
 
 		switch f := f.(type) {
+		case *PingFrame:
+			if f.ID%2 == 0 {
+				cc.fr.WritePing(f)
+			}
 		case *SettingsFrame:
 			f.ForeachSetting(func(s Setting) error {
 				switch s.ID {
