@@ -344,7 +344,7 @@ func (cc *clientConn) canTakeNewRequest() bool {
 	defer cc.mu.Unlock()
 	return cc.goAway == nil &&
 		int64(len(cc.streams)+1) < int64(cc.maxConcurrentStreams) &&
-		cc.nextStreamID < 2147483647
+		cc.nextStreamID < MAX_STREAM_ID
 }
 
 // requires cc.mu be held.
