@@ -3,6 +3,11 @@
 Implementation in Go. A learning exercise in implementing a network
 protocol in Go.
 
+# Testing
+
+Done interactively using `transport_test.go` along with the tools in
+examples to generate a self-signed cert and have a local server.
+
 # Disclaimer
 
 As a learning exercise, I didn't TDD this, but drove it using a single

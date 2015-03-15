@@ -1,1 +1,6 @@
+*.coverprofile
 _vendor
+cert.pem
+generate_cert
+key.pem
+server
