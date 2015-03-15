@@ -19,8 +19,8 @@ where it works.
 
 Writing this code suggested to me that it might be nice to have a
 implementers package in `net/http` which exposes some of the things
-like connection pooling. The existing fallback here for http and https
-doesn't have niceties like that.
+like connection pooling. The [existing fallback](https://github.com/jabley/spdy/blob/3ebe0224f91c066c52a7ce4d77f929ef32a1beac/transport.go#L63-L81) for https doesn't
+have niceties like that.
 
 It's also not finished. It doesn't support PUT and POST, for example.
 I'm not sure I will do that. For my purposes, GET is all that I need to
