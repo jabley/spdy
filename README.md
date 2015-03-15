@@ -5,7 +5,7 @@ A learning exercise in implementing a [network protocol](http://www.chromium.org
 # Testing
 
 Done interactively using `transport_test.go` along with the tools in
-examples to generate a self-signed cert and have a local server.
+`examples` to generate a self-signed cert and have a local server.
 
 # Disclaimer
 
