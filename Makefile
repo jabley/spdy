@@ -1,9 +1,7 @@
-.PHONY: deps test
+.PHONY: deps fmt test
 
 IMPORT_BASE := github.com/jabley
 IMPORT_PATH := $(IMPORT_BASE)/spdy
-
-GOOS := $(shell uname | tr '[:upper:]' '[:lower:]')
 
 all: deps _vendor fmt test
 
